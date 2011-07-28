@@ -79,7 +79,7 @@ static char *pi_devnode(struct device *dev, mode_t *mode)
     return NULL;
 }
 
-static int __init setup_module(void)
+int init_module(void)
 {
     printk(KERN_INFO "Entering init_module");
     Major = register_chrdev(PI_MAJOR, DEVICE_NAME, &fops);
@@ -98,7 +98,7 @@ static int __init setup_module(void)
     return 0;
 }
 
-void __exit destroy_module(void)
+void cleanup_module(void)
 {
     device_destroy(pi_class, MKDEV(PI_MAJOR, 1));
     unregister_chrdev(Major, DEVICE_NAME);
