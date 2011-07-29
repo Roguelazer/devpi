@@ -107,17 +107,16 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         c = d % 10000;
     }
     printk(KERN_INFO "Copying to userspace\n");
-    while (length) {
+    while (bytes_read < length) {
         size_t unwritten;
         size_t written;
-        size_t bytes_to_write = MIN(length, WRITE_SIZE);
+        size_t bytes_to_write = MIN(length - bytes_read, WRITE_SIZE);
         printk(KERN_INFO "Writing %zd bytes\n", bytes_to_write);
         unwritten = copy_to_user(buffer, cptr, bytes_to_write);
         written = bytes_to_write - written;
         cptr += written;
         buffer += written;
         bytes_read += written;
-        length -= written;
     }
     kfree(cbuf);
     kfree(r);
