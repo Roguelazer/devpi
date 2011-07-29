@@ -34,7 +34,7 @@ MODULE_LICENSE("GPL");
  *****************************/
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
-static enum pi_mode mode = DECIMAL;
+static enum pi_mode current_mode = DECIMAL;
 static unsigned max_opened = 32;
 static size_t max_decimal_size = (1<<20);
 static unsigned min_opened_threshold = 1;
@@ -63,9 +63,11 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
             return -EINVAL;
         }
         if ((bytes_to_write >= 7) && (strncmp(buf, "decimal", 7) == 0)) {
-            mode = DECIMAL;
+            current_mode = DECIMAL;
         } else if ((bytes_to_write >= 3) && strncmp(buf, "hex", 3) == 0) {
-            mode = HEX;
+            current_mode = HEX;
+        } else if ((bytes_to_write >= 6) && strncmp(buf, "string", 6) == 0) {
+            current_mode = STRING;
         } else {
             return -EINVAL;
         }
@@ -92,7 +94,7 @@ static ctl_table pi_table[] = {
     },
     {
         .procname = "mode",
-        .data = &mode,
+        .data = &current_mode,
         .proc_handler = proc_dopimode,
         .mode = 0644,
     },
@@ -168,6 +170,7 @@ static int device_open(struct inode* inodp, struct file* filp)
     if (filp->private_data == NULL)
         return -ENOMEM;
     ((struct pi_status*)filp->private_data)->bytes_read = 0;
+    ((struct pi_status*)filp->private_data)->mode = current_mode;
     return 0;
 }
 
@@ -183,69 +186,103 @@ static int device_release(struct inode* inodp, struct file* filp)
 static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t offset)
 {
     struct pi_status* status = (struct pi_status*)filp->private_data;
+    enum pi_mode mode = status->mode;
     size_t total_bytes_read = status->bytes_read;
     size_t total_length = total_bytes_read + length;
     size_t bytes_read = 0;
+    char* orig_cbuf = NULL;
+    char* cptr = NULL;
 
-    int size = (total_length >> 2) * 14;
-    int* r;
-    char* orig_cbuf;
-    char* cptr;
-    int i, k;
-    int b, d;
-    int c = 0;
-    if (size >= max_decimal_size) {
-        return -E2BIG;
-    }
-    r = kmalloc(size * sizeof(int) + 1, GFP_USER);
-    orig_cbuf = kmalloc((length + 2) * sizeof(char), GFP_USER);
-    cptr = orig_cbuf;
-    printk(KERN_INFO "Allocated orig_cbuf=%p, r=%p\n", orig_cbuf, r);
-    if (r == NULL) {
-        printk(KERN_INFO "r allocation failed\n");
-        return -ENOMEM;
-    } else if (orig_cbuf == NULL) {
-        printk(KERN_INFO "cbuf allocation failed\n");
-        kfree(r);
-        return -ENOMEM;
-    }
-    // Compute pi
-    printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
-    for (i = 0; i < size; ++i) {
-        //r[i] = size - total_length;
-        r[i] = 2000;
-    }
-    for (k = size; k > 0; k -= 14) {
-        d = 0;
-        i = k;
-        while (1) {
-            d += r[i] * 10000;
-            b = 2 * i - 1;
-            r[i] = d % b;
-            d /= b;
-            i--;
-            if (i == 0)
-                break;
-            d *= i;
+    printk("Top of file\n");
+
+    if (mode == DECIMAL) {
+        int size = (total_length >> 2) * 14;
+        int* r = NULL;
+        int i, k;
+        int b, d;
+        int c = 0;
+        if (size >= max_decimal_size) {
+            return -E2BIG;
         }
-        printk(KERN_INFO "Computed digits %.4d", c+d/10000);
-        // sprintf tacks on an extra NUL byte, which is annoying.
-        // just make the cbuf one byte larger because I don't want to
-        // reimplement sprintf
-        sprintf(cptr, "%.4d", c+d/10000);
-        cptr += 4;
-        c = d % 10000;
+        r = kmalloc(size * sizeof(int) + 1, GFP_USER);
+        orig_cbuf = kmalloc((length + 2) * sizeof(char), GFP_USER);
+        cptr = orig_cbuf;
+        printk(KERN_INFO "Allocated orig_cbuf=%p, r=%p\n", orig_cbuf, r);
+        if (r == NULL) {
+            printk(KERN_INFO "r allocation failed\n");
+            return -ENOMEM;
+        } else if (orig_cbuf == NULL) {
+            printk(KERN_INFO "cbuf allocation failed\n");
+            kfree(r);
+            return -ENOMEM;
+        }
+        // Compute pi
+        printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
+        for (i = 0; i < size; ++i) {
+            //r[i] = size - total_length;
+            r[i] = 2000;
+        }
+        for (k = size; k > 0; k -= 14) {
+            d = 0;
+            i = k;
+            while (1) {
+                d += r[i] * 10000;
+                b = 2 * i - 1;
+                r[i] = d % b;
+                d /= b;
+                i--;
+                if (i == 0)
+                    break;
+                d *= i;
+            }
+            printk(KERN_INFO "Computed digits %.4d", c+d/10000);
+            // sprintf tacks on an extra NUL byte, which is annoying.
+            // just make the cbuf one byte larger because I don't want to
+            // reimplement sprintf
+            sprintf(cptr, "%.4d", c+d/10000);
+            cptr += 4;
+            c = d % 10000;
+        }
+        if (r) {
+            printk(KERN_INFO "Freeing r %p\n", r);
+            kfree(r);
+            r = NULL;
+        }
+    } else if (mode == STRING) {
+        size_t bytes_prepared = 0;
+        int i = 0;
+        printk(KERN_INFO "In STRING mode, going to allocated %zd bytes\n", length);
+        orig_cbuf = kmalloc(length, GFP_USER);
+        if (orig_cbuf == NULL) {
+            printk(KERN_INFO "cbuf allocation failed\n");
+            return -ENOMEM;
+        }
+        printk(KERN_INFO "Allocated cbuf at 0x%p\n", orig_cbuf);
+        cptr = orig_cbuf;
+        while (bytes_prepared < length) {
+            size_t this_pie_copy = MIN(length - bytes_prepared, pie_sizes[i]);
+            printk(KERN_INFO "Copying in %zd bytes\n", this_pie_copy);
+            printk(KERN_INFO "Copying in pie '%s' to %p\n", pies[i], cptr);
+            memcpy(cptr, pies[i], this_pie_copy);
+            bytes_prepared += this_pie_copy;
+            cptr += this_pie_copy;
+            if ((length - bytes_prepared) > 0) {
+                *(cptr++) = '\n';
+                bytes_prepared++;
+            }
+            i = (i + 1) % NUM_PIES;
+        }
     }
     cptr = orig_cbuf;
-    printk(KERN_INFO "Copying to userspace\n");
+    printk(KERN_INFO "Copying to userspace from 0x%p\n", cptr);
     while (bytes_read < length) {
         size_t unwritten;
-        size_t written;
+        ssize_t written;
         size_t bytes_to_write = MIN(length - bytes_read, WRITE_SIZE);
         printk(KERN_INFO "Writing %zd bytes\n", bytes_to_write);
         unwritten = copy_to_user(buffer, cptr, bytes_to_write);
-        written = bytes_to_write - written;
-        printk(KERN_INFO "Wrote %zd bytes\n", written);
+        written = bytes_to_write - unwritten;
+        printk(KERN_INFO "Wrote %zd bytes (%zd unwritten)\n", written, unwritten);
         cptr += written;
         buffer += written;
         bytes_read += written;
@@ -254,11 +291,6 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         printk(KERN_INFO "Freeing orig_cbuf %p\n", orig_cbuf);
         kfree(orig_cbuf);
         orig_cbuf = NULL;
-    }
-    if (r) {
-        printk(KERN_INFO "Freeing r %p\n", r);
-        kfree(r);
-        r = NULL;
     }
     status->bytes_read += bytes_read;
     return bytes_read;
