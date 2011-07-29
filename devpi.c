@@ -72,8 +72,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     int size = (total_length >> 2) * 14;
     int* r = kmalloc(size * sizeof(int) + 1, GFP_USER); 
     char* orig_cbuf = kmalloc((length + 1) * sizeof(char), GFP_USER);
-    char* cbuf = orig_cbuf;
-    char* cptr;
+    char* cptr = orig_cbuf;
     int i, k;
     int b, d;
     int c = 0;
@@ -89,7 +88,8 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     // Compute pi
     printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
     for (i = 0; i < size; ++i) {
-        r[i] = size - total_length;
+        //r[i] = size - total_length;
+        r[i] = 2000;
     }
     for (k = size; k > 0; k -= 14) {
         d = 0;
@@ -105,10 +105,11 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
             d *= i;
         }
         printk(KERN_INFO "Computed digits %.4d", c+d/10000);
-        snprintf(cbuf, 4, "%.4d", c+d/10000);
-        cbuf += 4;
+        snprintf(cptr, 4, "%.4d", c+d/10000);
+        cptr += 4;
         c = d % 10000;
     }
+    cptr = orig_cbuf;
     printk(KERN_INFO "Copying to userspace\n");
     while (bytes_read < length) {
         size_t unwritten;
@@ -124,7 +125,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     if (orig_cbuf) {
         printk(KERN_INFO "Freeing orig_cbuf %p\n", orig_cbuf);
         kfree(orig_cbuf);
-        cbuf = NULL;
+        orig_cbuf = NULL;
     }
     if (r) {
         printk(KERN_INFO "Freeing r %p\n", r);
