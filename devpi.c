@@ -8,11 +8,14 @@
 #include <linux/string.h>
 #include <linux/device.h>
 #include <linux/miscdevice.h>
+#include <linux/random.h>
 #include <asm/uaccess.h>
 
 #include "devpi.h"
 
+#define MIN(a,b) ((a)>(b)?(b):(a))
 #define PI_MAJOR 235
+#define BUF_SIZE 32
 
 MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
 MODULE_AUTHOR("Evan Klitzke <evan@yelp.com>");
@@ -22,16 +25,14 @@ MODULE_LICENSE("GPL");
 static int device_open(struct inode*, struct file*);
 static int device_release(struct inode*, struct file*);
 static ssize_t device_read(struct file*, char* __user, size_t, loff_t);
-static ssize_t device_write(struct file*, const char*, size_t, loff_t*);
 
 static int opened;
-static const char* msg = "3.141592";
 
+static const char* msg = "3.14159";
 static struct class* pi_class;
 
 static struct file_operations fops = {
     .read = device_read,
-    .write = device_write,
     .open = device_open,
     .release = device_release
 };
@@ -61,12 +62,23 @@ static ssize_t device_read(struct file* filp, char* __user buffer, size_t length
         length--;
         bytes_read++;
     }
+    while (length) {
+        unsigned char rndbuf[BUF_SIZE];
+        size_t unwritten;
+        size_t bytes_to_write = MIN(BUF_SIZE, length);
+        int i;
+        get_random_bytes(rndbuf, BUF_SIZE);
+        for (i = 0; i < bytes_to_write; ++i) {
+            char new_value = (rndbuf[i] % 10);
+            rndbuf[i] = new_value + 48;
+        }
+        rndbuf[bytes_to_write] = '\0';
+        unwritten = copy_to_user(buffer, rndbuf, bytes_to_write-1);
+        buffer += (bytes_to_write - unwritten);
+        bytes_read += (bytes_to_write - unwritten);
+        length -= (bytes_to_write - unwritten);
+    }
     return bytes_read;
-}
-
-static ssize_t device_write(struct file *filp, const char *buff, size_t len, loff_t * off)
-{
-    return -EINVAL;
 }
 
 int init_module(void)
