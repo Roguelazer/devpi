@@ -3,3 +3,4 @@
 * Fix up style (get rid of C99-style comments, especially)
 * Implement other character device operations besides open(), read(), and
   close()
+* Write udev rules
