@@ -13,20 +13,115 @@
 #include <asm/segment.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-
 #include "devpi.h"
 
 #define MIN(a,b) ((a)>(b)?(b):(a))
-#define PI_MAJOR 235
 #define WRITE_SIZE 4096
-#define MAX_OPENED 32
-#define MAX_SIZE (1<<20)
 
+/*****************************
+ *
+ * module preamble
+ *
+ ****************************/
 MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
 MODULE_AUTHOR("Evan Klitzke <evan@yelp.com>");
 MODULE_LICENSE("GPL");
 
-/* Implementation predeclarations */
+/******************************
+ *
+ * sysctl interface
+ *
+ *****************************/
+#ifdef CONFIG_SYSCTL
+#include <linux/sysctl.h>
+static enum pi_mode mode = DECIMAL;
+static unsigned max_opened = 32;
+static size_t max_decimal_size = (1<<20);
+static unsigned min_opened_threshold = 1;
+static unsigned max_opened_threshold = 2;
+
+/* Read the string equivalents of the enum pi_mode modes */
+static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_t* lenp, loff_t* ppos)
+{
+    ctl_table fake_table;
+    char buf[10];
+    enum pi_mode pmode;
+
+    pmode = *((enum pi_mode*)table->data);
+    if ((pmode < PI_MODE_MIN) || (pmode > PI_MODE_MAX)) {
+        return 1;
+    }
+    sprintf(buf, "%s", pi_mode_map[pmode]);
+    fake_table.data = buf;
+    fake_table.maxlen = sizeof(buf);
+    return proc_dostring(&fake_table, write, buffer, lenp, ppos);
+}
+
+static ctl_table pi_table[] = {
+    {
+        .procname = "max_opened",
+        .data = &max_opened,
+        .maxlen = sizeof(unsigned),
+        .mode = 0644,
+        .proc_handler = proc_dointvec_minmax,
+        .extra1 = &min_opened_threshold,
+        .extra2 = &max_opened_threshold,
+    },
+    {
+        .procname = "max_decimal_size",
+        .data = &max_decimal_size,
+        .maxlen = sizeof(size_t),
+        .mode = 0644,
+        .proc_handler = proc_dointvec,
+    },
+    {
+        .procname = "mode",
+        .data = &mode,
+        .proc_handler = proc_dopimode,
+        .mode = 0644,
+    },
+    { }
+};
+static ctl_table pi_root[] = {
+    {
+        .procname = "pi",
+        .mode = 0555,
+        .child = pi_table,
+    },
+    { }
+};
+static ctl_table dev_root[] = {
+    {
+        .procname = "dev",
+        .mode = 0555,
+        .child = pi_root,
+    },
+    { }
+};
+static struct ctl_table_header* sysctl_handler;
+static int __init init_sysctl(void)
+{
+    sysctl_handler = register_sysctl_table(dev_root);
+    return 0;
+}
+
+static int __exit cleanup_sysctl(void)
+{
+    unregister_sysctl_table(sysctl_handler);
+    return 0;
+}
+#else
+#define max_opened 32
+#define max_decimal_size (1<<20)
+#define current_mode DECIMAL
+#endif /* CONFIG_SYSCTL */
+
+/******************************
+ *
+ * Implementation predeclarations
+ * (some of these are in devpi.h)
+ *
+ *****************************/
 static int device_open(struct inode*, struct file*);
 static int device_release(struct inode*, struct file*);
 static ssize_t device_read(struct file*, char __user *, size_t, loff_t);
@@ -41,9 +136,15 @@ static struct file_operations fops = {
     .release = device_release
 };
 
+/******************************
+ *
+ * Actual implementation
+ *
+ *****************************/
+
 static int device_open(struct inode* inodp, struct file* filp)
 {
-    if (opened > MAX_OPENED)
+    if (opened > max_opened)
         return -EBUSY;
     opened++;
     try_module_get(THIS_MODULE);
@@ -77,7 +178,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     int i, k;
     int b, d;
     int c = 0;
-    if (size >= MAX_SIZE) {
+    if (size >= max_decimal_size) {
         return -E2BIG;
     }
     r = kmalloc(size * sizeof(int) + 1, GFP_USER);
@@ -147,29 +248,33 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     return bytes_read;
 }
 
-int init_module(void)
+int __init init_module(void)
 {
     int err;
-    printk(KERN_INFO "Entering init_module");
-    err = register_chrdev(PI_MAJOR, DEVICE_NAME, &fops);
 
+    err = register_chrdev(PI_MAJOR, PI_DEVNAME, &fops);
     if (err < 0)
         printk(KERN_ALERT "Registering char device failed with %d\n", err);
 
-    pi_class = class_create(THIS_MODULE, "pi");
+    pi_class = class_create(THIS_MODULE, PI_CLASSNAME);
 
     if (IS_ERR(pi_class))
         return PTR_ERR(pi_class);
 
-    device_create(pi_class, NULL, MKDEV(PI_MAJOR, 1), NULL, "pi");
+    device_create(pi_class, NULL, MKDEV(PI_MAJOR, 1), NULL, PI_DEVNAME);
+#ifdef CONFIG_SYSCTL
+    (void) init_sysctl();
+#endif /* CONFIG_SYSCTL */
     return 0;
 }
 
-void cleanup_module(void)
+void __exit cleanup_module(void)
 {
-    printk(KERN_INFO "Entering cleanup_module");
     device_destroy(pi_class, MKDEV(PI_MAJOR, 1));
-    unregister_chrdev(PI_MAJOR, DEVICE_NAME);
+    unregister_chrdev(PI_MAJOR, PI_DEVNAME);
     class_destroy(pi_class);
+#ifdef CONFIG_SYSCTL
+    (void) cleanup_sysctl();
+#endif /* CONFIG_SYSCTL */
 }
 
