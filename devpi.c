@@ -88,7 +88,7 @@ static ctl_table pi_table[] = {
     {
         .procname = "max_decimal_size",
         .data = &max_decimal_size,
-        .maxlen = sizeof(size_t),
+        .maxlen = sizeof(int),
         .mode = 0644,
         .proc_handler = proc_dointvec,
     },
@@ -142,7 +142,7 @@ static int __exit cleanup_sysctl(void)
  *****************************/
 static int device_open(struct inode*, struct file*);
 static int device_release(struct inode*, struct file*);
-static ssize_t device_read(struct file*, char __user *, size_t, loff_t);
+static ssize_t device_read(struct file*, char __user *, size_t, loff_t*);
 
 static int opened;
 
@@ -183,7 +183,7 @@ static int device_release(struct inode* inodp, struct file* filp)
     return 0;
 }
 
-static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t offset)
+static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t* offset)
 {
     struct pi_status* status = (struct pi_status*)filp->private_data;
     enum pi_mode mode = status->mode;
@@ -192,8 +192,6 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     size_t bytes_read = 0;
     char* orig_cbuf = NULL;
     char* cptr = NULL;
-
-    printk("Top of file\n");
 
     /* Decimal computation of PI using only integer math */
     if (mode == DECIMAL) {
@@ -208,19 +206,16 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         r = kmalloc(size * sizeof(int) + 1, GFP_USER);
         orig_cbuf = kmalloc((length + 2) * sizeof(char), GFP_USER);
         cptr = orig_cbuf;
-        printk(KERN_INFO "Allocated orig_cbuf=%p, r=%p\n", orig_cbuf, r);
         if (r == NULL) {
-            printk(KERN_INFO "r allocation failed\n");
+            printk(KERN_WARNING "r allocation failed\n");
             return -ENOMEM;
         } else if (orig_cbuf == NULL) {
-            printk(KERN_INFO "cbuf allocation failed\n");
+            printk(KERN_WARNING "cbuf allocation failed\n");
             kfree(r);
             return -ENOMEM;
         }
-        // Compute pi
-        printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
+        /* Compute Pi */
         for (i = 0; i < size; ++i) {
-            //r[i] = size - total_length;
             r[i] = 2000;
         }
         for (k = size; k > 0; k -= 14) {
@@ -236,16 +231,14 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
                     break;
                 d *= i;
             }
-            printk(KERN_INFO "Computed digits %.4d", c+d/10000);
-            // sprintf tacks on an extra NUL byte, which is annoying.
-            // just make the cbuf one byte larger because I don't want to
-            // reimplement sprintf
+            /* sprintf tacks on an extra NUL byte, which is annoying.
+             * just make the cbuf one byte larger because I don't want to
+             * reimplement sprintf */
             sprintf(cptr, "%.4d", c+d/10000);
             cptr += 4;
             c = d % 10000;
         }
         if (r) {
-            printk(KERN_INFO "Freeing r %p\n", r);
             kfree(r);
             r = NULL;
         }
@@ -271,21 +264,17 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         }
     }
     cptr = orig_cbuf;
-    printk(KERN_INFO "Copying to userspace from 0x%p\n", cptr);
     while (bytes_read < length) {
         size_t unwritten;
         ssize_t written;
         size_t bytes_to_write = MIN(length - bytes_read, WRITE_SIZE);
-        printk(KERN_INFO "Writing %zd bytes\n", bytes_to_write);
         unwritten = copy_to_user(buffer, cptr, bytes_to_write);
         written = bytes_to_write - unwritten;
-        printk(KERN_INFO "Wrote %zd bytes (%zd unwritten)\n", written, unwritten);
         cptr += written;
         buffer += written;
         bytes_read += written;
     }
     if (orig_cbuf) {
-        printk(KERN_INFO "Freeing orig_cbuf %p\n", orig_cbuf);
         kfree(orig_cbuf);
         orig_cbuf = NULL;
     }

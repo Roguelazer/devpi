@@ -24,12 +24,13 @@ struct pi_status {
     enum pi_mode mode;
 };
 
-#define NUM_PIES 4
+#define NUM_PIES 5
 const char* pies[NUM_PIES] = {
     "apple",
     "pumpkin",
     "cherry",
     "banana cream",
+    "blueberry",
 };
 
 size_t pie_sizes[NUM_PIES] = {
@@ -37,6 +38,7 @@ size_t pie_sizes[NUM_PIES] = {
     7,
     6,
     12,
+    9,
 };
 
 #define PI_MAJOR 235
