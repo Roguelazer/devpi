@@ -50,7 +50,7 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
     if (!write) {
         pmode = *((enum pi_mode*)table->data);
         if ((pmode < PI_MODE_MIN) || (pmode > PI_MODE_MAX)) {
-            return 1;
+            return -EINVAL;
         }
         sprintf(buf, "%s", pi_mode_map[pmode]);
         fake_table.data = buf;
@@ -60,9 +60,15 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
         size_t bytes_to_write = MIN(10, *lenp);
         int bytes = copy_from_user(buf, buffer, bytes_to_write);
         if (bytes != 0) {
-            return -EBADE;
+            return -EINVAL;
         }
-        printk(KERN_INFO "Read %s (%zd bytes) from user\n", buf, bytes_to_write);
+        if ((bytes_to_write >= 7) && (strncmp(buf, "decimal", 7) == 0)) {
+            mode = DECIMAL;
+        } else if ((bytes_to_write >= 3) && strncmp(buf, "hex", 3) == 0) {
+            mode = HEX;
+        } else {
+            return -EINVAL;
+        }
         return 0;
     }
 }
