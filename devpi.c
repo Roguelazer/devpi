@@ -195,6 +195,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
 
     printk("Top of file\n");
 
+    /* Decimal computation of PI using only integer math */
     if (mode == DECIMAL) {
         int size = (total_length >> 2) * 14;
         int* r = NULL;
@@ -251,18 +252,14 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     } else if (mode == STRING) {
         size_t bytes_prepared = 0;
         int i = 0;
-        printk(KERN_INFO "In STRING mode, going to allocated %zd bytes\n", length);
         orig_cbuf = kmalloc(length, GFP_USER);
         if (orig_cbuf == NULL) {
-            printk(KERN_INFO "cbuf allocation failed\n");
+            printk(KERN_WARNING "cbuf allocation failed\n");
             return -ENOMEM;
         }
-        printk(KERN_INFO "Allocated cbuf at 0x%p\n", orig_cbuf);
         cptr = orig_cbuf;
         while (bytes_prepared < length) {
             size_t this_pie_copy = MIN(length - bytes_prepared, pie_sizes[i]);
-            printk(KERN_INFO "Copying in %zd bytes\n", this_pie_copy);
-            printk(KERN_INFO "Copying in pie '%s' to %p\n", pies[i], cptr);
             memcpy(cptr, pies[i], this_pie_copy);
             bytes_prepared += this_pie_copy;
             cptr += this_pie_copy;
