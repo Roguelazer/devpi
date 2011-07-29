@@ -1,0 +1,5 @@
+* Add a /proc interface to tweak some constants (like max number to calculate)
+* Maybe store a few MB of the r table in kernel mem between read calls?
+* Fix up style (get rid of C99-style comments, especially)
+* Implement other character device operations besides open(), read(), and
+  close()
