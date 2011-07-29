@@ -47,9 +47,9 @@ static int device_open(struct inode* inodp, struct file* filp)
     opened++;
     try_module_get(THIS_MODULE);
     filp->private_data = kmalloc(sizeof(struct pi_status), GFP_KERNEL);
-    ((struct pi_status*)filp->private_data)->bytes_read = 0;
     if (filp->private_data == NULL)
         return -ENOMEM;
+    ((struct pi_status*)filp->private_data)->bytes_read = 0;
     return 0;
 }
 
@@ -70,17 +70,19 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     size_t bytes_read = 0;
 
     int size = (total_length >> 2) * 14;
-    int* r = kmalloc(size * sizeof(int) + 1, GFP_KERNEL); 
-    char* cbuf = kmalloc((length + 1) * sizeof(char), GFP_KERNEL);
+    int* r = kmalloc(size * sizeof(int) + 1, GFP_USER); 
+    char* cbuf = kmalloc((length + 1) * sizeof(char), GFP_USER);
     char* cptr;
     int i, k;
     int b, d;
     int c = 0;
+    printk(KERN_INFO "Allocated cbuf=%p, r=%p\n", cbuf, r);
     if (r == NULL) {
         printk(KERN_INFO "r allocation failed\n");
         return -ENOMEM;
     } else if (cbuf == NULL) {
         printk(KERN_INFO "cbuf allocation failed\n");
+        kfree(r);
         return -ENOMEM;
     }
     // Compute pi
@@ -118,8 +120,16 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         buffer += written;
         bytes_read += written;
     }
-    kfree(cbuf);
-    kfree(r);
+    if (cbuf) {
+        printk(KERN_INFO "Freeing cbuf %p\n", cbuf);
+        kfree(cbuf);
+        cbuf = NULL;
+    }
+    if (r) {
+        printk(KERN_INFO "Freeing r %p\n", r);
+        kfree(r);
+        r = NULL;
+    }
     status->bytes_read += bytes_read;
     return bytes_read;
 }
