@@ -1,0 +1,7 @@
+*.ko
+*.o
+.devpi*
+.tmp*
+Module.symvers
+modules.order
+devpi.mod.c
