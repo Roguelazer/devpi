@@ -20,6 +20,7 @@
 #define PI_MAJOR 235
 #define WRITE_SIZE 4096
 #define MAX_OPENED 32
+#define MAX_SIZE (1<<20)
 
 MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
 MODULE_AUTHOR("Evan Klitzke <evan@yelp.com>");
@@ -70,12 +71,18 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     size_t bytes_read = 0;
 
     int size = (total_length >> 2) * 14;
-    int* r = kmalloc(size * sizeof(int) + 1, GFP_USER); 
-    char* orig_cbuf = kmalloc((length + 1) * sizeof(char), GFP_USER);
-    char* cptr = orig_cbuf;
+    int* r;
+    char* orig_cbuf;
+    char* cptr;
     int i, k;
     int b, d;
     int c = 0;
+    if (size >= MAX_SIZE) {
+        return -E2BIG;
+    }
+    r = kmalloc(size * sizeof(int) + 1, GFP_USER);
+    orig_cbuf = kmalloc((length + 2) * sizeof(char), GFP_USER);
+    cptr = orig_cbuf;
     printk(KERN_INFO "Allocated orig_cbuf=%p, r=%p\n", orig_cbuf, r);
     if (r == NULL) {
         printk(KERN_INFO "r allocation failed\n");
@@ -105,7 +112,10 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
             d *= i;
         }
         printk(KERN_INFO "Computed digits %.4d", c+d/10000);
-        snprintf(cptr, 4, "%.4d", c+d/10000);
+        // sprintf tacks on an extra NUL byte, which is annoying.
+        // just make the cbuf one byte larger because I don't want to
+        // reimplement sprintf
+        sprintf(cptr, "%.4d", c+d/10000);
         cptr += 4;
         c = d % 10000;
     }
@@ -118,6 +128,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         printk(KERN_INFO "Writing %zd bytes\n", bytes_to_write);
         unwritten = copy_to_user(buffer, cptr, bytes_to_write);
         written = bytes_to_write - written;
+        printk(KERN_INFO "Wrote %zd bytes\n", written);
         cptr += written;
         buffer += written;
         bytes_read += written;
