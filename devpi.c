@@ -73,13 +73,13 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
 
     int size = (total_length >> 2) * 14;
     int* r = kmalloc(size * sizeof(int) + 1, GFP_KERNEL); 
-    char* cbuf = kmalloc(length + 1 * sizeof(char), GFP_KERNEL);
+    char* cbuf = kmalloc((length + 1) * sizeof(char), GFP_KERNEL);
     char* cptr;
     int i, k;
     int b, d;
     int c = 0;
     // Compute pi
-    printk(KERN_INFO "Beginning PI computation for %zd digits\n", total_length);
+    printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
     for (i = 0; i < size; ++i) {
         r[i] = 2000;
     }
