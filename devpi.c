@@ -71,16 +71,17 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
 
     int size = (total_length >> 2) * 14;
     int* r = kmalloc(size * sizeof(int) + 1, GFP_USER); 
-    char* cbuf = kmalloc((length + 1) * sizeof(char), GFP_USER);
+    char* orig_cbuf = kmalloc((length + 1) * sizeof(char), GFP_USER);
+    char* cbuf = orig_cbuf;
     char* cptr;
     int i, k;
     int b, d;
     int c = 0;
-    printk(KERN_INFO "Allocated cbuf=%p, r=%p\n", cbuf, r);
+    printk(KERN_INFO "Allocated orig_cbuf=%p, r=%p\n", orig_cbuf, r);
     if (r == NULL) {
         printk(KERN_INFO "r allocation failed\n");
         return -ENOMEM;
-    } else if (cbuf == NULL) {
+    } else if (orig_cbuf == NULL) {
         printk(KERN_INFO "cbuf allocation failed\n");
         kfree(r);
         return -ENOMEM;
@@ -120,9 +121,9 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         buffer += written;
         bytes_read += written;
     }
-    if (cbuf) {
-        printk(KERN_INFO "Freeing cbuf %p\n", cbuf);
-        kfree(cbuf);
+    if (orig_cbuf) {
+        printk(KERN_INFO "Freeing orig_cbuf %p\n", orig_cbuf);
+        kfree(orig_cbuf);
         cbuf = NULL;
     }
     if (r) {
