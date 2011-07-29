@@ -67,33 +67,52 @@ static int device_release(struct inode* inodp, struct file* filp)
 static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t offset)
 {
     struct pi_status* status = (struct pi_status*)filp->private_data;
-    int total_bytes_read = status->bytes_read;
-    int bytes_read = 0;
-    printk(KERN_INFO "Trying to read %zd bytes, message is %zd bytes long, offset is %llu bytes\n", length, msg_len, offset);
-    while (length && (bytes_read + total_bytes_read < msg_len)) {
-        if (put_user(msg[bytes_read + total_bytes_read], buffer++)) {
-            return -EFAULT;
-        }
-        length--;
-        bytes_read++;
+    size_t total_bytes_read = status->bytes_read;
+    size_t total_length = total_bytes_read + length;
+    size_t bytes_read = 0;
+
+    int size = (total_length >> 2) * 14;
+    int* r = kmalloc(size * sizeof(int) + 1, GFP_KERNEL); 
+    char* cbuf = kmalloc(length + 1 * sizeof(char), GFP_KERNEL);
+    char* cptr;
+    int i, k;
+    int b, d;
+    int c = 0;
+    // Compute pi
+    printk(KERN_INFO "Beginning PI computation for %zd digits\n", total_length);
+    for (i = 0; i < size; ++i) {
+        r[i] = 2000;
     }
-    printk(KERN_INFO "Now going to read %zd bytes", length);
-    while (length) {
-        unsigned char rndbuf[BUF_SIZE];
-        size_t unwritten;
-        size_t bytes_to_write = MIN(BUF_SIZE, length);
-        int i;
-        get_random_bytes(rndbuf, BUF_SIZE);
-        for (i = 0; i < bytes_to_write; ++i) {
-            char new_value = (rndbuf[i] % 10);
-            rndbuf[i] = new_value + 48;
+    for (k = size; k > 0; k -= 14) {
+        d = 0;
+        i = k;
+        while (1) {
+            d += r[i] * 10000;
+            b = 2 * i - 1;
+            r[i] = d % b;
+            d /= b;
+            i--;
+            if (i == 0)
+                break;
+            d *= i;
         }
-        rndbuf[bytes_to_write] = '\0';
-        unwritten = copy_to_user(buffer, rndbuf, bytes_to_write - 1);
+        printk(KERN_INFO "Computed digits %.4d", c+d/10000);
+        sprintf(cbuf, "%.4d", c+d/10000);
+        cbuf += 4;
+        c = d % 10000;
+    }
+    printk(KERN_INFO "Copying to userspace\n");
+    while (length) {
+        size_t unwritten;
+        size_t bytes_to_write = length;
+        unwritten = copy_to_user(buffer, cptr, bytes_to_write);
+        cptr += (bytes_to_write - unwritten);
         buffer += (bytes_to_write - unwritten);
         bytes_read += (bytes_to_write - unwritten);
         length -= (bytes_to_write - unwritten);
     }
+    kfree(cbuf);
+    kfree(r);
     status->bytes_read += bytes_read;
     return bytes_read;
 }
