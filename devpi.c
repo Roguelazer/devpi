@@ -72,7 +72,7 @@ static ssize_t device_read(struct file* filp, char* __user buffer, size_t length
             char new_value = (rndbuf[i] % 10);
             rndbuf[i] = new_value + 48;
         }
-        rndbuf[bytes_to_write] = '\0';
+        rndbuf[bytes_to_write + 1] = '\0';
         unwritten = copy_to_user(buffer, rndbuf, bytes_to_write-1);
         buffer += (bytes_to_write - unwritten);
         bytes_read += (bytes_to_write - unwritten);
