@@ -18,7 +18,7 @@
 
 #define MIN(a,b) ((a)>(b)?(b):(a))
 #define PI_MAJOR 235
-#define BUF_SIZE 32
+#define WRITE_SIZE 4096
 #define MAX_OPENED 32
 
 MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
@@ -86,6 +86,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     for (k = size; k > 0; k -= 14) {
         d = 0;
         i = k;
+        /*
         while (1) {
             d += r[i] * 10000;
             b = 2 * i - 1;
@@ -96,20 +97,24 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
                 break;
             d *= i;
         }
+        */
         printk(KERN_INFO "Computed digits %.4d", c+d/10000);
-        sprintf(cbuf, "%.4d", c+d/10000);
+        snprintf(cbuf, 4, "%.4d", c+d/10000);
         cbuf += 4;
         c = d % 10000;
     }
     printk(KERN_INFO "Copying to userspace\n");
     while (length) {
         size_t unwritten;
-        size_t bytes_to_write = length;
+        size_t written;
+        size_t bytes_to_write = MIN(length, WRITE_SIZE);
+        printk(KERN_INFO "Writing %zd bytes\n", bytes_to_write);
         unwritten = copy_to_user(buffer, cptr, bytes_to_write);
-        cptr += (bytes_to_write - unwritten);
-        buffer += (bytes_to_write - unwritten);
-        bytes_read += (bytes_to_write - unwritten);
-        length -= (bytes_to_write - unwritten);
+        written = bytes_to_write - written;
+        cptr += written;
+        buffer += written;
+        bytes_read += written;
+        length -= written;
     }
     kfree(cbuf);
     kfree(r);
