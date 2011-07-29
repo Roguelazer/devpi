@@ -16,5 +16,5 @@ all: test_script
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
 
-test:
+test: test.c
 	gcc -o test test.c

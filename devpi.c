@@ -76,15 +76,21 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
     int i, k;
     int b, d;
     int c = 0;
+    if (r == NULL) {
+        printk(KERN_INFO "r allocation failed\n");
+        return -ENOMEM;
+    } else if (cbuf == NULL) {
+        printk(KERN_INFO "cbuf allocation failed\n");
+        return -ENOMEM;
+    }
     // Compute pi
     printk(KERN_INFO "Beginning PI computation for %zd digits, creating %zd bytes for r and %zd bytes for cbuf\n", total_length, size * sizeof(int) + 1, (length + 1) * sizeof(char));
     for (i = 0; i < size; ++i) {
-        r[i] = 2000;
+        r[i] = size - total_length;
     }
     for (k = size; k > 0; k -= 14) {
         d = 0;
         i = k;
-        /*
         while (1) {
             d += r[i] * 10000;
             b = 2 * i - 1;
@@ -95,7 +101,6 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
                 break;
             d *= i;
         }
-        */
         printk(KERN_INFO "Computed digits %.4d", c+d/10000);
         snprintf(cbuf, 4, "%.4d", c+d/10000);
         cbuf += 4;
