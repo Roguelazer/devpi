@@ -47,14 +47,24 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
     char buf[10];
     enum pi_mode pmode;
 
-    pmode = *((enum pi_mode*)table->data);
-    if ((pmode < PI_MODE_MIN) || (pmode > PI_MODE_MAX)) {
-        return 1;
+    if (!write) {
+        pmode = *((enum pi_mode*)table->data);
+        if ((pmode < PI_MODE_MIN) || (pmode > PI_MODE_MAX)) {
+            return 1;
+        }
+        sprintf(buf, "%s", pi_mode_map[pmode]);
+        fake_table.data = buf;
+        fake_table.maxlen = sizeof(buf);
+        return proc_dostring(&fake_table, write, buffer, lenp, ppos);
+    } else {
+        size_t bytes_to_write = MIN(10, *lenp);
+        int bytes = copy_from_user(buf, buffer, bytes_to_write);
+        if (bytes != 0) {
+            return -EBADE;
+        }
+        printk(KERN_INFO "Read %s (%zd bytes) from user\n", buf, bytes_to_write);
+        return 0;
     }
-    sprintf(buf, "%s", pi_mode_map[pmode]);
-    fake_table.data = buf;
-    fake_table.maxlen = sizeof(buf);
-    return proc_dostring(&fake_table, write, buffer, lenp, ppos);
 }
 
 static ctl_table pi_table[] = {
