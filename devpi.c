@@ -10,12 +10,16 @@
 #include <linux/miscdevice.h>
 #include <linux/random.h>
 #include <asm/uaccess.h>
+#include <asm/segment.h>
+#include <linux/mm.h>
+#include <linux/slab.h>
 
 #include "devpi.h"
 
 #define MIN(a,b) ((a)>(b)?(b):(a))
 #define PI_MAJOR 235
 #define BUF_SIZE 32
+#define MAX_OPENED 32
 
 MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
 MODULE_AUTHOR("Evan Klitzke <evan@yelp.com>");
@@ -29,6 +33,7 @@ static ssize_t device_read(struct file*, char __user *, size_t, loff_t);
 static int opened;
 
 static const char* msg = "3.14159";
+ssize_t msg_len;
 static struct class* pi_class;
 
 static struct file_operations fops = {
@@ -37,31 +42,42 @@ static struct file_operations fops = {
     .release = device_release
 };
 
-static int device_open(struct inode* inode, struct file* file)
+static int device_open(struct inode* inodp, struct file* filp)
 {
-    if (opened)
+    if (opened > MAX_OPENED)
         return -EBUSY;
     opened++;
     try_module_get(THIS_MODULE);
+    filp->private_data = kmalloc(sizeof(struct pi_status), GFP_KERNEL);
+    ((struct pi_status*)filp->private_data)->bytes_read = 0;
+    if (filp->private_data == NULL)
+        return -ENOMEM;
     return 0;
 }
 
-static int device_release(struct inode* inode, struct file* file)
+static int device_release(struct inode* inodp, struct file* filp)
 {
     opened--;
+    if (filp->private_data)
+        kfree(filp->private_data);
     module_put(THIS_MODULE);
     return 0;
 }
 
 static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t offset)
 {
-    int bytes_read;
-    char* msgPtr = (char*) msg;
-    while (length && *msgPtr) {
-        put_user(*(msgPtr++), buffer++);
+    struct pi_status* status = (struct pi_status*)filp->private_data;
+    int total_bytes_read = status->bytes_read;
+    int bytes_read = 0;
+    printk(KERN_INFO "Trying to read %zd bytes, message is %zd bytes long, offset is %llu bytes\n", length, msg_len, offset);
+    while (length && (bytes_read + total_bytes_read < msg_len)) {
+        if (put_user(msg[bytes_read + total_bytes_read], buffer++)) {
+            return -EFAULT;
+        }
         length--;
         bytes_read++;
     }
+    printk(KERN_INFO "Now going to read %zd bytes", length);
     while (length) {
         unsigned char rndbuf[BUF_SIZE];
         size_t unwritten;
@@ -72,18 +88,20 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
             char new_value = (rndbuf[i] % 10);
             rndbuf[i] = new_value + 48;
         }
-        rndbuf[bytes_to_write + 1] = '\0';
-        unwritten = copy_to_user(buffer, rndbuf, bytes_to_write-1);
+        rndbuf[bytes_to_write] = '\0';
+        unwritten = copy_to_user(buffer, rndbuf, bytes_to_write - 1);
         buffer += (bytes_to_write - unwritten);
         bytes_read += (bytes_to_write - unwritten);
         length -= (bytes_to_write - unwritten);
     }
+    status->bytes_read += bytes_read;
     return bytes_read;
 }
 
 int init_module(void)
 {
     int err;
+    msg_len = strlen(msg);
     printk(KERN_INFO "Entering init_module");
     err = register_chrdev(PI_MAJOR, DEVICE_NAME, &fops);
 
