@@ -62,11 +62,11 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
         if (bytes != 0) {
             return -EINVAL;
         }
-        if ((bytes_to_write >= 7) && (strncmp(buf, "decimal", 7) == 0)) {
+        if ((bytes_to_write >= strlen(pi_mode_map[DECIMAL])) && (strncmp(buf, pi_mode_map[DECIMAL], strlen(pi_mode_map[DECIMAL])) == 0)) {
             current_mode = DECIMAL;
-        } else if ((bytes_to_write >= 3) && strncmp(buf, "hex", 3) == 0) {
+        } else if ((bytes_to_write >= strlen(pi_mode_map[HEX])) && strncmp(buf, pi_mode_map[HEX], strlen(pi_mode_map[HEX])) == 0) {
             current_mode = HEX;
-        } else if ((bytes_to_write >= 6) && strncmp(buf, "string", 6) == 0) {
+        } else if ((bytes_to_write >= strlen(pi_mode_map[STRING])) && strncmp(buf, pi_mode_map[STRING], strlen(pi_mode_map[STRING])) == 0) {
             current_mode = STRING;
         } else {
             return -EINVAL;
@@ -253,6 +253,7 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
         cptr = orig_cbuf;
         while (bytes_prepared < length) {
             size_t this_pie_copy = MIN(length - bytes_prepared, pie_sizes[i]);
+            unsigned int randint;
             memcpy(cptr, pies[i], this_pie_copy);
             bytes_prepared += this_pie_copy;
             cptr += this_pie_copy;
@@ -260,7 +261,8 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
                 *(cptr++) = '\n';
                 bytes_prepared++;
             }
-            i = (i + 1) % NUM_PIES;
+            get_random_bytes(&randint, sizeof(unsigned int));
+            i = randint % NUM_PIES;
         }
     }
     cptr = orig_cbuf;

@@ -16,7 +16,7 @@ enum pi_mode {
 const char* pi_mode_map[] = {
     [0] = "hex",
     [1] = "decimal",
-    [2] = "string",
+    [2] = "pie",
 };
 
 struct pi_status {
@@ -24,13 +24,17 @@ struct pi_status {
     enum pi_mode mode;
 };
 
-#define NUM_PIES 5
+#define NUM_PIES 9
 const char* pies[NUM_PIES] = {
     "apple",
     "pumpkin",
     "cherry",
     "banana cream",
     "blueberry",
+    "raspberry",
+    "lemon meringue",
+    "shepherd's",
+    "meat",
 };
 
 size_t pie_sizes[NUM_PIES] = {
@@ -39,6 +43,10 @@ size_t pie_sizes[NUM_PIES] = {
     6,
     12,
     9,
+    9,
+    14,
+    10,
+    4,
 };
 
 #define PI_MAJOR 235
