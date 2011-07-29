@@ -24,7 +24,7 @@ MODULE_LICENSE("GPL");
 /* Implementation predeclarations */
 static int device_open(struct inode*, struct file*);
 static int device_release(struct inode*, struct file*);
-static ssize_t device_read(struct file*, char* __user, size_t, loff_t);
+static ssize_t device_read(struct file*, char __user *, size_t, loff_t);
 
 static int opened;
 
@@ -53,7 +53,7 @@ static int device_release(struct inode* inode, struct file* file)
     return 0;
 }
 
-static ssize_t device_read(struct file* filp, char* __user buffer, size_t length, loff_t offset)
+static ssize_t device_read(struct file* filp, char __user * buffer, size_t length, loff_t offset)
 {
     int bytes_read;
     char* msgPtr = (char*) msg;
