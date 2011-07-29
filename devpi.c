@@ -32,8 +32,6 @@ static ssize_t device_read(struct file*, char __user *, size_t, loff_t);
 
 static int opened;
 
-static const char* msg = "3.14159";
-ssize_t msg_len;
 static struct class* pi_class;
 
 static struct file_operations fops = {
@@ -125,7 +123,6 @@ static ssize_t device_read(struct file* filp, char __user * buffer, size_t lengt
 int init_module(void)
 {
     int err;
-    msg_len = strlen(msg);
     printk(KERN_INFO "Entering init_module");
     err = register_chrdev(PI_MAJOR, DEVICE_NAME, &fops);
 
