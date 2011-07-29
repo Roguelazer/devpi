@@ -10,8 +10,11 @@ KVERSION = $(shell uname -r)
 
 obj-m += devpi.o
 
-all:
+all: test_script
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+test_script:
+	gcc -o test test.c
