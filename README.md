@@ -10,10 +10,10 @@ Enter */dev/pi*. It's irrationally better.
 
 Building
 --------
-You'll need kernel sources and a reasonably-modern (2.6 or 3.0). Just type
-`make`, then `insmod devpi.ko`. This will create a device node at `/dev/pi`,
-which is only accessible by root. Feel free to use udev or whatever else
-to change its permissions.
+You'll need kernel sources and a reasonably-modern (2.6 or above, tested up to
+4.9.13). Just type `make`, then `insmod devpi.ko`. This will create a device
+node at `/dev/pi`, which is only accessible by root. Feel free to use udev or
+whatever else to change its permissions.
 
 Contributing
 ------------
@@ -27,5 +27,5 @@ full text of this license is available under LICENSE.txt
 
 Authors
 -------
-* James Brown <mailto:jbrown@yelp.com>
-* Evan Klitzke <mailto:evan@yelp.com>
+* James Brown <mailto:r@rglzr.net>
+* Evan Klitzke <mailto:evan@eklitzke.org>
