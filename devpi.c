@@ -41,9 +41,9 @@ static unsigned min_opened_threshold = 1;
 static unsigned max_opened_threshold = 2;
 
 /* Read the string equivalents of the enum pi_mode modes */
-static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_t* lenp, loff_t* ppos)
+static int proc_dopimode(struct ctl_table* table, int write, void __user* buffer, size_t* lenp, loff_t* ppos)
 {
-    ctl_table fake_table;
+    struct ctl_table fake_table;
     char buf[10];
     enum pi_mode pmode;
 
@@ -75,7 +75,7 @@ static int proc_dopimode(ctl_table* table, int write, void __user* buffer, size_
     }
 }
 
-static ctl_table pi_table[] = {
+static struct ctl_table pi_table[] = {
     {
         .procname = "max_opened",
         .data = &max_opened,
@@ -100,7 +100,7 @@ static ctl_table pi_table[] = {
     },
     { }
 };
-static ctl_table pi_root[] = {
+static struct ctl_table pi_root[] = {
     {
         .procname = "pi",
         .mode = 0555,
@@ -108,7 +108,7 @@ static ctl_table pi_root[] = {
     },
     { }
 };
-static ctl_table dev_root[] = {
+static struct ctl_table dev_root[] = {
     {
         .procname = "dev",
         .mode = 0555,
