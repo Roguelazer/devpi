@@ -23,8 +23,8 @@
  * module preamble
  *
  ****************************/
-MODULE_AUTHOR("James Brown <jbrown@yelp.com>");
-MODULE_AUTHOR("Evan Klitzke <evan@yelp.com>");
+MODULE_AUTHOR("James Brown <r@rglzr.net>");
+MODULE_AUTHOR("Evan Klitzke <evan@eklitzke.org>");
 MODULE_LICENSE("GPL");
 
 /******************************
